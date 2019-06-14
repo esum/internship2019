@@ -15,7 +15,7 @@ Require Import seq2 arith.
  *   P 1
  *   -> (forall m n, m > 0 -> n > 0 -> coprime m n -> P m -> P n -> P (m * n))
  *   -> (forall p a, prime p -> 0 < a -> P (p ^ a))
- *   -> (forall d n, prime_decomp n = d -> n > 0 -> P n).
+ *   -> (forall n, n > 0 -> P n).
  *)
 
 
@@ -298,7 +298,7 @@ Proof.
   by rewrite -bigop.BigOp.bigopE IHl.
 Qed.
 
-Lemma primespow_induction : forall P,
+Lemma primespow_induction_decomp : forall P,
   P 1
   -> (forall m n, m > 0 -> n > 0 -> coprime m n -> P m -> P n -> P (m * n))
   -> (forall p a, prime p -> 0 < a -> P (p ^ a))
@@ -377,7 +377,6 @@ Proof.
         inversion n_decomp_logn as [[Ha Hd]].
         rewrite -Hd p_eq_q.
         rewrite p_eq_q in Heqq.
-        Print nthP.
         apply/(nthP (0, 0)).
         exists i ; first rewrite size_map // in Hi.
         rewrite Hd (nth_map 0) // -Heqq //.
@@ -402,6 +401,16 @@ Proof.
    pose proof (sorted_primes n) as primes_sorted.
    unfold primes in primes_sorted.
    by rewrite n_decomp in primes_sorted.
+Qed.
+
+Lemma primespow_induction : forall P,
+  P 1
+  -> (forall m n, m > 0 -> n > 0 -> coprime m n -> P m -> P n -> P (m * n))
+  -> (forall p a, prime p -> 0 < a -> P (p ^ a))
+  -> (forall n,n > 0 -> P n).
+Proof.
+  move=> P P_1 IHprod IHprimepow n n_gt_0.
+  by apply primespow_induction_decomp with (prime_decomp n).
 Qed.
 
 End primespow_induction.
