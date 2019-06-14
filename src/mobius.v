@@ -1,7 +1,7 @@
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq ssreflect.prime div.
 From mathcomp Require Import path fintype bigop.
 Add LoadPath "~/git/git.graillo.tf/stage/2019-06/src".
-Require Import seq2 arith ssrz sumz.
+Require Import seq2 arith ssrz sumz primes_induction.
 
 (* Definition and properties of the M\u00f6bius function.
  *)
@@ -30,14 +30,7 @@ Proof.
   by case: (odd (size (prime_decomp m.+2))) ; case: (odd (size (prime_decomp n.+2))).
 Qed.
 
-Lemma primespow_induction : forall P,
-  P 1
-  -> (forall m n, m > 0 -> n > 0 -> coprime m n -> P m -> P n -> P (m * n))
-  -> (forall p a, prime p -> 0 < a -> P (p^a))
-  -> (forall n, P n).
-Admitted.
-
-Lemma mobius_sum : forall n, \sumz_(d %| n) \mu(d) = Znn (n == 1).
+Lemma mobius_sum : forall n, n > 0 -> \sumz_(d %| n) \mu(d) = Znn (n == 1).
 Proof.
   apply primespow_induction ; first rewrite BigOp.bigopE //=.
   move=> m n m_gt_0 n_gt_0 m_coprime_n sum_div_m sum_div_n.
@@ -48,6 +41,11 @@ Proof.
     rewrite /= eq_sym (ltn_eqF (prime_gt0 p_prime)) eq_sym (ltn_eqF (prime_gt1 p_prime)).
     unfold prime in p_prime.
     destruct (prime_decomp p) as [|[p' [|[|a]]] [|]] ; by [].
+    assert (p ^ a.+2 != 1) as result_0.
+      apply/negP.
+      move=> H.
+      rewrite expn_eq1 eq_sym (ltn_eqF (prime_gt1 p_prime)) -eqnE // in H.
+    destruct (p ^ a.+2 == 1) ; first by [] ; clear result_0.
     pose proof (primepow_prime_exp p a.+2 p_prime a_gt_0) as H.
     apply primepow_divisors in H.
     rewrite prime_decompE primes_exp // primes_prime //= lognX lognn p_prime muln1 //= in H.
@@ -60,7 +58,26 @@ Proof.
       rewrite ?p_prime /=.
       move/eqP in p_prime.
       rewrite -prime_decomp_prime in p_prime.
-      rewrite ?prime_decomp_primepow //= expn_eq0 expn_eq1 -eqnE //= eqnE orbF.
+      rewrite ?prime_decomp_primepow //= expn_eq0 expn_eq1 -eqnE //= eqnE orbF
+        add0z ltn0Sn andbT
+        eq_sym (ltn_eqF (prime_gt0 p_prime))
+        eq_sym (ltn_eqF (prime_gt1 p_prime)) add0z.
+      rewrite -BigOp.bigopE.
+      apply sumz0.
+      apply/allP.
+      move=> d Hd.
+      rewrite -map_comp in Hd.
+      move/nthP in Hd.
+      pose proof (Hd (Znn 0)) as Hd.
+      destruct Hd as [i Hi Hd].
+      rewrite size_map in Hi.
+      rewrite (nth_map 0) // in Hd.
+      destruct (nth 0 (iota 3 a) i) as [|[|n]]eqn:Hn ;
+        apply (mem_nth 0) in Hi as Hi0 ; rewrite mem_iota Hn // in Hi0.
+      rewrite -Hd //= expn_eq0 expn_eq1 -eqnE /= ltn0Sn
+        orbF andbT eqnE !eqn0Ngt (prime_gt0 p_prime) /=
+        eqn_leq leqNgt (prime_gt1 p_prime) /=
+        prime_decomp_primepow //.
 Admitted.
 
 Lemma mobius_inversion :
