@@ -517,4 +517,83 @@ Proof.
     rewrite -H2 H1 in H' ; by destruct H'.
 Qed.
 
+Lemma divisors_div_dvdn : forall n d, 0 < n -> d \in [seq n %/ d | d <- divisors n] -> d %| n.
+Proof.
+  move=> n d n_gt_0 d_in_ddiv.
+  move/mapP in d_in_ddiv.
+  destruct d_in_ddiv as [d' d'_dvd_n d_eq_n_div_d'].
+  rewrite d_eq_n_div_d'.
+  apply dvdn_div.
+  rewrite dvdn_divisors //.
+Qed.
 
+Lemma divisors_gt0 : forall n d, d \in divisors n -> d > 0.
+Proof.
+  case=> [|n] d d_dvd_n.
+    unfold divisors in d_dvd_n.
+    simpl in d_dvd_n.
+    rewrite mem_seq1 in d_dvd_n.
+    move/eqP in d_dvd_n.
+    by rewrite d_dvd_n.
+  rewrite -dvdn_divisors in d_dvd_n ; last by apply ltn0Sn.
+  apply dvdn_gt0 with (n.+1) ; last by [].
+  apply ltn0Sn.
+Qed.
+
+Lemma mem_divisors_dvdn : forall n d, d \in divisors n -> d %| n.
+Proof.
+  case=> [|n] d d_dvd_n ; first by apply dvdn0.
+  by rewrite dvdn_divisors.
+Qed.
+
+Lemma mulnr : forall m n p, 0 < m -> (n * m == p * m) = (n == p).
+Proof.
+  elim=> [|m IHm] n p m_gt_0 ; first by [].
+Admitted.
+
+
+Lemma div_divisors_perm : forall n, 0 < n -> perm_eq [seq n %/ d | d <- divisors n] (divisors n).
+Proof.
+  move=> n n_gt_0.
+  apply uniq_perm.
+  rewrite map_inj_in_uniq ; first by apply divisors_uniq.
+  move=> d d' d_dvd_n d'_dvd_n n_div_d_eq_n_div_d'.
+  assert (0 < d) as d_gt_0 by
+    by apply divisors_gt0 with n.
+  assert (0 < d') as d'_gt_0 by
+    by apply divisors_gt0 with n.
+  assert (d' * (n %/ d) = n) as H.
+    rewrite n_div_d_eq_n_div_d' muln_divA.
+    by rewrite -{2}(muln1 d') divnMl // divn1.
+    by apply: mem_divisors_dvdn.
+  assert (d' * n = d * n) as H0.
+    rewrite -{2}H mulnA (mulnC d d') -mulnA (mulnC d) divn_mulAC.
+    rewrite mulnK //.
+    by apply: mem_divisors_dvdn.
+  move/eqP in H0.
+  apply/eqP ; rewrite eq_sym -(mulnr n) //.
+  apply divisors_uniq.
+  move=> d.
+  apply/eqP/equiv_eqP.
+  apply/nthP ; apply 0.
+  apply/idP.
+  split.
+    move=> [i Hi H].
+    rewrite size_map in Hi.
+    rewrite ?(nth_map 0) // in H.
+    apply (mem_nth 0) in Hi as H0.
+    remember (nth 0 (divisors n) i) as m eqn:Heqm ; rewrite -Heqm in H0.
+    rewrite -dvdn_divisors //.
+    rewrite -dvdn_divisors // in H0.
+    apply dvdn_div in H0.
+    by rewrite -H.
+    move=> d_dvd_n.
+    apply/nthP.
+    rewrite -dvdn_divisors // in d_dvd_n.
+    assert (d = n %/ (n %/ d)).
+      rewrite divnA // -divn_mulAC.
+      rewrite divnn n_gt_0 mul1n //.
+      apply dvdnn.
+    rewrite H (map_f (fun d => n %/ d)) // -dvdn_divisors //.
+    by apply dvdn_div.
+Qed.
