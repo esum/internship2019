@@ -34,7 +34,16 @@ Lemma mobius_sum : forall n, n > 0 -> \sumz_(d %| n) \mu(d) = Znn (n == 1).
 Proof.
   apply primespow_induction ; first rewrite BigOp.bigopE //=.
   move=> m n m_gt_0 n_gt_0 m_coprime_n sum_div_m sum_div_n.
-    admit.
+    rewrite muln_eq1.
+    assert (Znn ((m == 1) && (n == 1)) = mulz (Znn (m == 1)) (Znn (n == 1))) as H
+      by by [case (m == 1) ; case (n == 1) ; by rewrite ?muln1 //].
+    rewrite H -sum_div_m -sum_div_n -sumzDl sumz_div_mul.
+    apply eq_big_seq ; move=> d1 d1_dvd_m ; rewrite -sumzDr.
+    apply eq_big_seq ; move=> d2 d2_dvd_n.
+    rewrite -?dvdn_divisors // in d1_dvd_m, d2_dvd_n.
+    rewrite mobius_mul_coprime //.
+    apply coprime_dvdl with m ; first by [] ;
+    by apply coprime_dvdr with n.
   move=> p [|[|a]] p_prime a_gt_0 ; rewrite BigOp.bigopE //.
     rewrite expn1 divisors_prime //= addz0.
     unfold mobius.
@@ -78,7 +87,7 @@ Proof.
         orbF andbT eqnE !eqn0Ngt (prime_gt0 p_prime) /=
         eqn_leq leqNgt (prime_gt1 p_prime) /=
         prime_decomp_primepow //.
-Admitted.
+Qed.
 
 Lemma mobius_inversion :
   forall f n, 0 < n
@@ -102,4 +111,45 @@ Proof.
     rewrite dvdnn //.
     rewrite dvdn_divisors //.
   rewrite step1.
-Admitted.
+  assert (
+    \sumz_ (d %| n) mulz \mu (n %/ d) (\sumz_ (d' %| d) f d')
+    =  \sumz_ (d %| n) (\sumz_ (d' %| d) mulz \mu (n %/ d) (f d'))
+    ) as step2.
+  apply eq_big ; first by [] ;
+    move=> d _.
+  by rewrite -sumzDr.
+  rewrite step2.
+  rewrite (sumz_div_div (fun m d' => mulz \mu(m) (f d'))) //.
+  assert (
+    \sumz_ (d' %| n) \sumz_ (d %| n %/ d') mulz \mu (d) (f d')
+    = \sumz_ (d' %| n) mulz (f d') (\sumz_ (d %| n %/ d') \mu (d))
+    ) as step3.
+  apply eq_big ; first by [] ;
+    move=> d _.
+  by rewrite mulzC sumzDl.
+  rewrite step3.
+  assert (
+    \sumz_ (d' %| n) mulz (f d') (\sumz_ (d %| n %/ d') \mu (d))
+    = \sumz_ (d' %| n) mulz (f d') (Znn (n == d'))
+    ) as step4.
+  apply eq_big_seq ;
+    move=> d d_dvd_n.
+  rewrite -dvdn_divisors // in d_dvd_n.
+  assert (0 < d) as d_gt_0 by by apply dvdn_gt0 with n.
+  rewrite mobius_sum //.
+  rewrite -(eqn_pmul2r d_gt_0).
+  rewrite dvdn_eq in d_dvd_n.
+  move/eqP in d_dvd_n.
+  by rewrite d_dvd_n mul1n.
+  rewrite divn_gt0 // dvdn_leq //.
+  rewrite step4.
+  rewrite sumz_kronecker -big_filter (bigD1_seq n) /=.
+  rewrite -big_filter -filter_predI.
+  assert ((predI (fun i : nat => i != n) (eq_op n)) =1 (fun n => false)) as H.
+    move=> m /=.
+    rewrite eq_sym ; by case (n == m).
+  by rewrite (eq_filter H) filter_pred0 big_nil addz0.
+  rewrite mem_filter eq_refl divisors_id //.
+  rewrite filter_uniq //.
+  apply divisors_uniq.
+Qed.
