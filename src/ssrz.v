@@ -115,6 +115,16 @@ Definition addz_rec m n := addz_fix m n (Nat.min (abs m) (abs n)).
 Definition addz := nosimpl addz_rec.
 Notation "m + n" := (addn m n) : Z_scope.
 
+Local Lemma addz_Zne : forall m n, addz (Zne m) (Zne n) = Zne (m + n).+1.
+Proof.
+  by move=> [|?] [|?].
+Qed.
+
+Local Lemma addz_Znn : forall m n, addz (Znn m) (Znn n) = Znn (m + n).
+Proof.
+  by move=> [|?] [|?].
+Qed.
+
 Lemma add0z : left_id (Znn 0) addz.
 Proof. by case. Qed.
 
@@ -293,3 +303,77 @@ Qed.
 Lemma mul1z : left_id  (Znn 1) mulz. Proof. case=> [[|?]|[|?]] ; rewrite /= ?mul1n //. Qed.
 Lemma mulz1 : right_id (Znn 1) mulz. Proof. case=> [[|?]|[|?]] ; rewrite /= ?muln1 // ; congr Zne ; ring. Qed.
 
+Lemma mulzA : associative mulz.
+Proof.
+  move=> [[|m]|[|m]] ;
+    first move=> b c ; first rewrite mul0z ?add0z //.
+  move=> [[|n]|[|n]] ;
+    first move=>   c ; first rewrite mul0z ?addz0 //.
+  move=> [[|p]|[|p]] ; first rewrite ?mulz0 // ;
+    first congr Znn ; first ring ;
+    rewrite /= -mulnE plusE ; congr Zne ; ring.
+  move=> [[|p]|[|p]] ; first rewrite ?mulz0 // ;
+    first congr Zne ; first ring ;
+    congr Znn ; ring.
+  move=> [[|p]|[|p]] ; first rewrite ?mulz0 // ;
+    first congr Zne ; first ring ;
+    congr Znn ; ring.
+  move=> [[|n]|[|n]] ;
+    first move=>   c ; first rewrite mul0z ?addz0 //.
+  move=> [[|p]|[|p]] ; first rewrite ?mulz0 // ;
+    first by [rewrite /= -mulnE plusE ; congr Zne ; ring] ;
+    congr Znn ; ring.
+  move=> [[|p]|[|p]] ; rewrite ?mulz0 // ;
+    rewrite /= plusE ; congr Zne ; ring.
+  move=> [[|p]|[|p]] ; first rewrite ?mulz0 // ;
+    first by [congr Znn ; ring] ;
+    rewrite /= -mulnE plusE ; congr Zne ; ring.
+  move=> [[|n]|[|n]] ;
+    first move=>   c ; first rewrite mul0z ?addz0 //.
+  move=> [[|p]|[|p]] ; first rewrite ?mulz0 // ;
+    first by [rewrite /= -mulnE plusE ; congr Zne ; ring] ;
+    congr Znn ; ring.
+  move=> [[|p]|[|p]] ; first rewrite ?mulz0 // ;
+    first by [congr Znn ; ring] ;
+    rewrite /= -mulnE ?plusE ; congr Zne ; ring.
+  move=> [[|p]|[|p]] ; first rewrite ?mulz0 // ;
+    first by [congr Znn ; ring] ;
+    rewrite /= -mulnE plusE ; congr Zne ; ring.
+Qed.
+
+
+Lemma mulzDl : left_distributive mulz addz.
+Proof.
+  move=> [m|m] ; elim: m => [|m IHm] ;
+    first move=> b c ; first rewrite mul0z ?add0z //.
+  move=> [[|n]|[|n]] ;
+    first move=>   c ; first rewrite mul0z ?addz0 //.
+  move=> [[|p]|[|p]] ; first rewrite ?mulz0 //.
+    rewrite /= -[addz (Znn (m.+1 * p.+1)) (Znn (n.+1 * p.+1))]/(Znn(m.+1 * p.+1 + n.+1 * p.+1))
+      mulnDl //.
+    rewrite /= -addnE ?muln0 ?add0n ?addn0.
+      destruct m ; case: n => [|n] // ;
+        congr Zne ; ring.
+    rewrite /= -addnE addz_Zne ;
+      congr Zne ; ring.
+  move=> [[|p]|[|p]] ; first rewrite ?mulz0 //.
+    destruct m ; rewrite /= mul0n ?add0n ; first rewrite mul1n ;
+      first elim: p => [|p IHp] //.
+    elim: p => [|p IHp] //.
+    rewrite -[p.+2]/(1 + p.+1) ?mulnDr ?muln1 -[Znn (m.+1 + m.+1 * p.+1)]/(addz (Znn (m.+1)) (Znn (m.+1 * p.+1)))
+      IHp addzA addz_Znn.
+      assert (m.+2 + m.+2 * p.+1 = (m.+1 + m.+2 * p.+1).+1) as H by ring.
+      by rewrite H.
+    rewrite -[addz (Znn m.+1) (Zne 0)]/(Znn m).
+    destruct m ; first by [] ;
+      rewrite /= ?muln0 ?add0n ?addn0 muln1 ; by case m.
+    rewrite -[addz (Znn m.+1) (Zne 0)]/(Znn m).
+    destruct m ; first rewrite /= mul0n ?add0n ?mul1n ;
+      first elim: p => [|p IHp] //.
+Admitted.
+
+Lemma mulzDr : right_distributive mulz addz.
+Proof.
+  move=> a b c ;
+  rewrite mulzC mulzDl ; congr addz ; by rewrite mulzC.
+Qed.
