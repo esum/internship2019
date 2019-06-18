@@ -1,4 +1,4 @@
-From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq ssreflect.prime div.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq prime div.
 From mathcomp Require Import path fintype bigop.
 Add LoadPath "~/git/git.graillo.tf/stage/2019-06/src".
 Require Import seq2 ssrz arith primes_induction.
@@ -70,9 +70,16 @@ Proof.
   by rewrite mulz0 add0z.
 Qed.
 
-Lemma sumz_div_inv : forall f n,
-  \sumz_(d %| n) f d = \sumz_(d %| n) f (n %/ d).
-Admitted.
+Lemma sumz_div_inv :
+  forall f n, 0 < n
+  -> \sumz_(d %| n) f d = \sumz_(d %| n) f (n %/ d).
+Proof.
+  move=> f n n_gt_0.
+  rewrite -(big_map (fun d => n %/ d) predT f).
+  apply perm_big.
+  rewrite perm_sym.
+  by apply div_divisors_perm.
+Qed.
 
 Lemma sumz_div_mul : forall f m n,
   \sumz_(d %| m * n) f d = \sumz_(d1 %| m) (\sumz_(d2 %| n) f (d1 * d2)).
