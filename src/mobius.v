@@ -94,7 +94,7 @@ Lemma mobius_inversion :
   -> f n = \sumz_(d %| n) mulz \mu(d) (\sumz_(d' %| n %/ d) f d').
 Proof.
   move=> f n n_gt_0.
-  rewrite sumz_div_inv.
+  rewrite sumz_div_inv //.
   assert (
     \sumz_ (d %| n) mulz \mu (n %/ d) (\sumz_ (d' %| n %/ (n %/ d)) f d')
     = \sumz_ (d %| n) mulz \mu (n %/ d) (\sumz_ (d' %| d) f d')
