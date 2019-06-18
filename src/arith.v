@@ -597,3 +597,88 @@ Proof.
     rewrite H (map_f (fun d => n %/ d)) // -dvdn_divisors //.
     by apply dvdn_div.
 Qed.
+
+Lemma fact_prod : forall n, n`! = \prod_(1 <= i < n.+1) i.
+Proof.
+  elim=> [|n IHn] ; first by rewrite BigOp.bigopE.
+  assert (1 <= n.+1) as Sn_ge_1 by by [].
+  apply/eqP ; rewrite eq_sym ; apply/eqP.
+  rewrite factS IHn (big_cat_nat _ _ _ Sn_ge_1) //=.
+  rewrite mulnC {1}BigOp.bigopE /=.
+  unfold index_iota at 1.
+  by rewrite -[n.+2]/(2 + n) -{2}[n.+1]/(1 + n) subnDr /= muln1.
+Qed.
+
+Lemma divn_primepow_eq0 :
+  forall n p a, prime p
+  -> n > 0
+  -> a > trunc_log p n -> n %/ p ^ a = 0.
+Proof.
+  move=> n p a p_prime n_gt_0 a_gt_logn_p_n.
+  apply divn_small.
+  apply ltn_leq_trans with (p ^ (trunc_log p n).+1) ; rewrite /=.
+  pose proof (trunc_log_bounds (prime_gt1 p_prime) n_gt_0) as H.
+  move/andP in H ; by destruct H.
+  rewrite leq_exp2l //.
+  apply (prime_gt1 p_prime).
+Qed.
+
+Lemma leq_logn_trunc_log :
+  forall n p, n > 0
+  -> p > 1
+  -> logn p n <= trunc_log p n.
+Proof.
+  move=> n p n_gt_0 p_prime.
+  apply trunc_log_max ;
+    first by [].
+  apply dvdn_leq ;
+    first by [].
+  apply pfactor_dvdnn.
+Qed.
+
+Lemma leq_trunc_log :
+  forall p m n, p > 1
+  -> 0 < m <= n
+  -> trunc_log p m <= trunc_log p n.
+Proof.
+  move=> p m n p_gt_1 m_ge_n_gt_0.
+  move/andP in m_ge_n_gt_0.
+  destruct m_ge_n_gt_0 as [m_gt_0 m_le_n].
+  apply trunc_log_max ; first by [].
+  apply leq_trans with m ; last by [].
+  by apply trunc_logP.
+Qed.
+
+Lemma expn_ltn_exp :
+  forall m n p, 1 < p
+  -> p ^ n <= m
+  -> n < m.
+Proof.
+  move=> m n ; move: m.
+  elim: n => [|n IHn] m p p_gt_1 p_n_le_m.
+    rewrite expn0 in p_n_le_m ;
+    by apply leq_trans with 1.
+  destruct m.
+  rewrite leqn0 expn_eq0 in p_n_le_m.
+  move/andP in p_n_le_m.
+  destruct p_n_le_m as [p_eq_0 _].
+  move/eqP in p_eq_0.
+  by rewrite p_eq_0 in p_gt_1.
+  assert (m > 0) as m_gt_0.
+    apply ltn_leq_trans with 1 ; first by [].
+    assert (p <= m.+1) as p_le_Sm.
+      apply leq_trans with (p ^ n.+1) ; last by [].
+      rewrite -{1}(expn1 p).
+      by apply leq_pexp2l ; first by apply leq_trans with 2.
+    by assert (1 < m.+1) by by apply ltn_leq_trans with p.
+  apply (leq_div2r p) in p_n_le_m.
+  rewrite expnS -{3}(muln1 p) divnMl in p_n_le_m ; last by apply leq_trans with 2.
+  rewrite divn1 in p_n_le_m.
+  apply IHn with p ; first by [].
+  apply leq_trans with (m.+1 %/ p) ; first by [].
+  rewrite -addn1.
+  apply leq_trans with (m %/ p + 1 %/ p + 1) ; first by apply leq_divDl.
+  assert (1 %/ p = 0) as H by by apply divn_small.
+  rewrite H addn0 addn1 ltn_divLR ; last by apply leq_trans with 2.
+  by apply ltn_Pmulr.
+Qed.
