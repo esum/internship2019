@@ -407,7 +407,7 @@ Lemma primespow_induction : forall P,
   P 1
   -> (forall m n, m > 0 -> n > 0 -> coprime m n -> P m -> P n -> P (m * n))
   -> (forall p a, prime p -> 0 < a -> P (p ^ a))
-  -> (forall n,n > 0 -> P n).
+  -> (forall n, n > 0 -> P n).
 Proof.
   move=> P P_1 IHprod IHprimepow n n_gt_0.
   by apply primespow_induction_decomp with (prime_decomp n).
