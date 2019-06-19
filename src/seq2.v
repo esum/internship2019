@@ -30,3 +30,10 @@ Proof.
   by rewrite mem_head_or_behead eq_refl.
 Qed.
 
+Lemma zip_map {T1 T2 R1 R2 : Type} :
+  forall {f : T1 -> R1} {g : T2 -> R2} (s1 : seq T1) (s2 : seq T2),
+  zip [seq f x | x <- s1] [seq g x | x <- s2] = [seq (f x.1, g x.2) | x <- zip s1 s2].
+Proof.
+  move=> f g ; elim=> [|h1 s1 IHs1] [|h2 s2] //.
+  by rewrite /= IHs1.
+Qed.
