@@ -37,7 +37,7 @@ Proof.
     rewrite muln_eq1.
     assert (Znn ((m == 1) && (n == 1)) = mulz (Znn (m == 1)) (Znn (n == 1))) as H
       by by [case (m == 1) ; case (n == 1) ; by rewrite ?muln1 //].
-    rewrite H -sum_div_m -sum_div_n -sumzDl sumz_div_mul.
+    rewrite H -sum_div_m -sum_div_n -sumzDl sumz_div_mul //.
     apply eq_big_seq ; move=> d1 d1_dvd_m ; rewrite -sumzDr.
     apply eq_big_seq ; move=> d2 d2_dvd_n.
     rewrite -?dvdn_divisors // in d1_dvd_m, d2_dvd_n.
