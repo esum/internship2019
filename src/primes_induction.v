@@ -61,7 +61,7 @@ Proof.
   move=> ? ? ? ; apply ltn_trans.
 Qed.
 
-Local Lemma primes_induction_aux_aux_aux :
+Local Lemma primes_induction_aux_aux_aux2 :
   forall m n, coprime m n
   -> 0 < m -> 0 < n
   -> perm_eq (primes (m * n)) ((primes m) ++ (primes n)).
@@ -88,6 +88,36 @@ Proof.
       apply uniq_primes_m_cat_primes_n.
     move=> p.
     by rewrite mem_cat primes_mul.
+Qed.
+
+Local Lemma primes_induction_aux_aux_aux :
+  forall m n, coprime m n
+  -> 0 < m -> 0 < n
+  -> primes (m * n) = merge leq (primes m) (primes n).
+Proof.
+  move=> m n m_coprime_n m_gt_0 n_gt_0.
+  apply eq_sorted with leq.
+    by move ; apply leq_trans.
+    by move ; apply anti_leq.
+    pose proof (sorted_primes (m * n)) as sorted_primes_m_n.
+    rewrite ltn_sorted_uniq_leq in sorted_primes_m_n.
+    move/andP in sorted_primes_m_n.
+    by destruct sorted_primes_m_n.
+    apply merge_sorted.
+      by move ; apply leq_total.
+      pose proof (sorted_primes m) as sorted_primes_m.
+      rewrite ltn_sorted_uniq_leq in sorted_primes_m.
+      move/andP in sorted_primes_m.
+      by destruct sorted_primes_m.
+      pose proof (sorted_primes n) as sorted_primes_n.
+      rewrite ltn_sorted_uniq_leq in sorted_primes_n.
+      move/andP in sorted_primes_n.
+      by destruct sorted_primes_n.
+  apply perm_trans with (primes m ++ primes n) ;
+    first by apply primes_induction_aux_aux_aux2.
+  rewrite perm_sym.
+  apply/permPl.
+  apply perm_merge.
 Qed.
 
 Local Lemma primes_induction_aux_aux :
@@ -151,7 +181,7 @@ Proof.
     simpl.
     rewrite primes_m in p_lt_pdiv_m.
     simpl in p_lt_pdiv_m.
-    rewrite ltnNge leq_eqVlt p_lt_pdiv_m orbC /=.
+    rewrite leqNgt p_lt_pdiv_m /=.
     congr cons.
     unfold primes in primes_m.
     by rewrite primes_m.
