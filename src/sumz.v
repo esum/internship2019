@@ -109,17 +109,42 @@ Proof.
   by apply div_divisors_perm.
 Qed.
 
+Lemma map_map2_comp {T1 T2 T3 T4 : Type} :
+  forall {f : T1 -> T2 -> T3} {g : T3 -> T4}
+  {s1 : seq T1} {s2 : seq T2},
+  [seq g (f x y) | x <- s1, y <- s2] = [seq g z | z <- [seq f x y | x <- s1, y <- s2]].
+Proof.
+  move=> f g ; elim=> [|h1 s1 IHs1] // ; case=> [|h2 s2] //.
+  rewrite /= ?map_const.
+  assert (forall T : Type, flatten (nseq (size s1) [::]) = ([::] : seq T)) as step by
+    by move: (size s1) ; elim=> [|k IHk].
+  by rewrite ?step.
+  rewrite /=.
+  congr cons.
+  rewrite map_cat.
+  congr cat ; first by rewrite map_comp.
+  by rewrite (IHs1 (h2::s2)).
+Qed.
+
 Lemma sumz_div_mul :
   forall f m n, 0 < m -> 0 < n
+  -> coprime m n
   -> \sumz_(d %| m * n) f d = \sumz_(d1 %| m) (\sumz_(d2 %| n) f (d1 * d2)).
 Proof.
-  move=> f m n m_gt_0 n_gt_0.
+  move=> f m n m_gt_0 n_gt_0 m_coprime_n.
   apply/eqP ; rewrite eq_sym.
-  rewrite (eq_big_seq (fun d1 => \sumz_(1 <= d2 < n.+1 | d1 %| n) f (d1 * d2))).
-  rewrite sumz_div_pred //.
-Admitted.
-
-Print eq_big.
+  assert (
+    \sumz_(d1 %| m) \sumz_(d2 %| n) f (d1 * d2)
+    = \sumz_(d <- [seq (d1, d2) | d1 <- divisors m, d2 <- divisors n]) f (d.1 * d.2)
+    ) as step by by rewrite big_allpairs.
+  rewrite step.
+  rewrite -(big_map (fun d => d.1 * d.2) predT).
+  apply/eqP.
+  apply perm_big.
+  rewrite perm_sym.
+  rewrite -map_map2_comp /=.
+  by apply divisors_coprime.
+Qed.
 
 Lemma eq_in_big :
    forall {R : Type} {idx : R} {op} {I : eqType}
@@ -199,7 +224,7 @@ Proof.
       rewrite map_inj_in_uniq ; first by [apply filter_uniq ; apply iota_uniq].
       move=> d d' d_in d'_in H.
       move/eqP in H.
-      rewrite ?(mulnC d2) mulnr // in H.
+      rewrite ?(mulnC d2) (eqn_pmul2r d2_gt_0) // in H.
       by apply/eqP.
     move=> d.
     apply/eqP/equiv_eqP ; first apply/idP ; first apply/idP.
@@ -234,7 +259,7 @@ Proof.
       move=> a b H.
       rewrite ?(mulnC d2) in H.
       move/eqP in H.
-      rewrite mulnr // in H.
+      rewrite (eqn_pmul2r d2_gt_0) // in H.
       by apply/eqP.
       move/nthP in d_in.
       destruct (d_in 0) as [i Hi Hd].
