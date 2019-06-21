@@ -64,9 +64,31 @@ Qed.
 Local Lemma primes_induction_aux_aux_aux :
   forall m n, coprime m n
   -> 0 < m -> 0 < n
-  -> primes (m * n) = merge ltn (primes m) (primes n).
+  -> perm_eq (primes (m * n)) ((primes m) ++ (primes n)).
 Proof.
-Admitted.
+  move=> m n m_coprime_n m_gt_0 n_gt_0.
+  assert (uniq (primes m ++ primes n)) as uniq_primes_m_cat_primes_n.
+    rewrite cat_uniq.
+    apply/and3P.
+    split ; [by apply primes_uniq | | by apply primes_uniq].
+    apply/negP ; move=> H.
+    move/hasP in H.
+    destruct H as [p p_in_primes_n p_in_primes_m].
+    rewrite /= ?mem_primes in p_in_primes_m p_in_primes_n.
+    move/and3P in p_in_primes_m.
+    move/and3P in p_in_primes_n.
+    destruct p_in_primes_m as [p_prime _ p_dvd_m].
+    destruct p_in_primes_n as [_       _ p_dvd_n].
+    assert (coprime p n) as p_coprime_n by
+      by apply coprime_dvdl with m.
+    rewrite prime_coprime // in p_coprime_n.
+    by rewrite p_dvd_n in p_coprime_n.
+    apply uniq_perm.
+      apply primes_uniq.
+      apply uniq_primes_m_cat_primes_n.
+    move=> p.
+    by rewrite mem_cat primes_mul.
+Qed.
 
 Local Lemma primes_induction_aux_aux :
   forall p m a, prime p
@@ -219,7 +241,7 @@ Proof.
     destruct primes_sorted as [p_lt_q _] ; by rewrite p_lt_q.
 Qed.
 
-Lemma primes_induction : forall P,
+Lemma primes_induction_decomp : forall P,
   P 1
   -> (forall m n, m > 0 -> n > 0 -> P m -> P n -> P (m * n))
   -> (forall p, prime p -> P p)
@@ -279,6 +301,16 @@ Proof.
    pose proof (sorted_primes n) as primes_sorted.
    unfold primes in primes_sorted.
    by rewrite n_decomp in primes_sorted.
+Qed.
+
+Lemma primes_induction : forall P,
+  P 1
+  -> (forall m n, m > 0 -> n > 0 -> P m -> P n -> P (m * n))
+  -> (forall p, prime p -> P p)
+  -> (forall n, n > 0 -> P n).
+Proof.
+  move=> P P_1 IHprod IHprimepow n n_gt_0.
+  by apply primes_induction_decomp with (prime_decomp n).
 Qed.
 
 End primes_induction.
