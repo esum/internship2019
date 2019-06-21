@@ -14,6 +14,16 @@ Proof.
   apply Bool.ReflectT ; by split.
 Qed.
 
+Lemma anti_ltn : antisymmetric ltn.
+Proof.
+  move=> m n H.
+  move/andP in H.
+  rewrite /= in H.
+  destruct H as [m_lt_n n_lt_m].
+  pose proof (ltn_trans m_lt_n n_lt_m) as absurd.
+  by rewrite ltnn in absurd.
+Qed.
+
 Lemma expn_eq1 : forall m n, (m ^ n == 1) = (m == 1) || (n == 0).
 Proof.
   move=> m ; elim=> [|n IHn].
@@ -152,6 +162,18 @@ Proof.
     by [].
 Qed.
 
+Lemma mem_primes2 :
+  forall n p, (p \in primes n) = (0 < logn p n).
+Proof.
+  move=> n p.
+  rewrite mem_primes lognE.
+  apply/eqP/equiv_eqP.
+  apply/idP.
+  apply/idP.
+  split.
+  move=> H ; by rewrite H.
+  by case ([&& prime p, 0 < n & p %| n]).
+Qed.
 
 Section primepow_divisors.
 
@@ -571,7 +593,7 @@ Proof.
     rewrite mulnK //.
     by apply: mem_divisors_dvdn.
   move/eqP in H0.
-  apply/eqP ; rewrite eq_sym -(mulnr n) //.
+  apply/eqP ; rewrite eq_sym -(eqn_pmul2r n_gt_0) //.
   apply divisors_uniq.
   move=> d.
   apply/eqP/equiv_eqP.
@@ -682,3 +704,839 @@ Proof.
   rewrite H addn0 addn1 ltn_divLR ; last by apply leq_trans with 2.
   by apply ltn_Pmulr.
 Qed.
+
+Lemma prime_decomp_injective :
+  forall m n, 0 < m -> 0 < n
+  -> prime_decomp m = prime_decomp n
+  -> m = n.
+Proof.
+  move=> m n m_gt_0 n_gt_0 H.
+  by rewrite (prod_prime_decomp m_gt_0) (prod_prime_decomp n_gt_0) H.
+Qed.
+
+Lemma logn_eq :
+  forall m n, 0 < m -> 0 < n
+  -> (forall p, logn p m = logn p n)
+  -> m = n.
+Proof.
+  move=> m n m_gt_0 n_gt_0 H.
+  apply prime_decomp_injective ; [by []|by []|].
+  rewrite ?prime_decompE.
+  apply eq_map_eq.
+    move=> p ; by rewrite H.
+  apply eq_sorted with ltn.
+    by move ; apply ltn_trans.
+    by move ; apply anti_ltn.
+    apply sorted_primes.
+    apply sorted_primes.
+    apply uniq_perm.
+    apply primes_uniq.
+    apply primes_uniq.
+    move=> p.
+    by rewrite ?mem_primes2 H.
+Qed.
+
+Lemma logn_eq_prime :
+  forall m n, 0 < m -> 0 < n
+  -> (forall p, prime p -> logn p m = logn p n)
+  -> m = n.
+Proof.
+  move=> m n m_gt_0 n_gt_0 H.
+  apply prime_decomp_injective ; [by []|by []|].
+  rewrite ?prime_decompE.
+  apply eq_in_map_eq.
+  move=> p p_in.
+  rewrite H //.
+  rewrite mem_primes in p_in.
+  move/and3P in p_in.
+  by destruct p_in.
+  apply eq_sorted with ltn.
+    by move ; apply ltn_trans.
+    by move ; apply anti_ltn.
+    apply sorted_primes.
+    apply sorted_primes.
+    apply uniq_perm.
+    apply primes_uniq.
+    apply primes_uniq.
+    move=> p.
+    rewrite ?mem_primes2.
+    destruct (prime p)eqn:p_prime.
+    by rewrite H.
+    unfold logn.
+    by rewrite p_prime.
+Qed.
+
+Section logn_dvdn_prime.
+
+Local Lemma logn_dvdn_prime_aux {T : eqType} :
+  forall p f (s : seq T), {in s, forall x, ltn 0 (f x)}
+  -> (p \in primes (\prod_(x <- s) f x)) = \big[orb/false]_(x <- s) (p \in primes (f x)).
+Proof.
+  move=> p f ; elim=> [|h s IHs] Hf.
+    by rewrite ?big_nil.
+  rewrite ?big_cons primes_mul.
+  rewrite IHs //.
+  move=> x x_in.
+    apply Hf.
+    by apply mem_behead.
+  apply Hf ; by apply mem_head.
+  apply ltn_0_prod_f.
+  apply/allP.
+  move=> x x_in.
+  move/nthP in x_in.
+  destruct (x_in 0) as [i Hi Hx].
+  rewrite size_map in Hi.
+  rewrite (nth_map h) // in Hx.
+  rewrite -Hx.
+  apply Hf.
+  rewrite -[nth h s i]/(nth h (h::s) i.+1).
+  by apply mem_nth.
+Qed.
+
+Local Lemma logn_dvdn_prime_aux3 :
+     forall m primes_m, primes_m = primes m -> 0 < m
+  -> forall n primes_n, primes_n = primes n -> 0 < n
+  -> (forall p, prime p -> logn p m <= logn p n)
+  -> m %| n.
+Proof.
+  move=> m primes_m ; move: m.
+  elim: primes_m => [|p primes_m IHprimes_m].
+    move=> m Hprimes_m m_gt_0 n primes_n Hprimes_n n_gt_0 H.
+    by rewrite (prod_prime_decomp m_gt_0) ?prime_decompE big_map -Hprimes_m big_nil dvd1n.
+  move=> m Hprimes_m m_gt_0 n primes_n ; move: n.
+  elim: primes_n => [|q primes_n IHprimes_n].
+    move=> n Hprimes_n n_gt_0 H.
+    assert (n = 1) as n_eq_1 by
+      by rewrite (prod_prime_decomp n_gt_0) ?prime_decompE big_map -Hprimes_n big_nil.
+    rewrite n_eq_1 dvdn1.
+    apply/eqP.
+    apply logn_eq_prime ; [by []|by []|].
+    move=> r r_prime.
+    rewrite logn1.
+    apply/eqP.
+    rewrite -leqn0.
+    rewrite n_eq_1 in H.
+    apply leq_trans with (logn r 1) ; first by apply H.
+    by rewrite logn1.
+  move=> n Hprimes_n n_gt_0 H.
+  assert (prime p) as p_prime.
+    assert (p \in primes m) as p_prime by by rewrite -Hprimes_m mem_head.
+    rewrite mem_primes in p_prime.
+    move/and3P in p_prime.
+    by destruct p_prime.
+  assert (prime q) as q_prime.
+    assert (q \in primes n) as q_prime by by rewrite -Hprimes_n mem_head.
+    rewrite mem_primes in q_prime.
+    move/and3P in q_prime.
+    by destruct q_prime.
+  assert (p = pdiv m) as p_pdiv_m by
+    by unfold pdiv ; rewrite -Hprimes_m /=.
+  assert (q = pdiv n) as q_pdiv_n by
+    by unfold pdiv ; rewrite -Hprimes_n /=.
+  assert (q <= p) as q_le_p.
+    rewrite q_pdiv_n.
+    apply pdiv_min_dvd ; first by apply prime_gt1.
+  pose proof (mem_primes p n) as p_in_primes_n.
+  rewrite p_prime n_gt_0 /= in p_in_primes_n.
+  rewrite -p_in_primes_n -logn_gt0.
+  apply leq_trans with (logn p m) ; last by apply H.
+  by rewrite logn_gt0 mem_primes p_prime m_gt_0 /= p_pdiv_m pdiv_dvd.
+  rewrite leq_eqVlt eq_sym in q_le_p.
+  rewrite (prod_prime_decomp m_gt_0) (prod_prime_decomp n_gt_0)
+    ?prime_decompE big_map.
+  assert (
+    \prod_(f <- [seq (p, logn p n) | p <- primes n]) f.1 ^ f.2
+    = \prod_(j <- primes n) (j, logn j n).1 ^ (j, logn j n).2
+    ) as step by by rewrite big_map. rewrite step /= ; clear step.
+  rewrite -Hprimes_m -Hprimes_n ?big_cons.
+  assert (0 < \prod_(j <- primes_m) j ^ logn j m) as prod_m_gt_0.
+    apply ltn_0_prod_f.
+    apply/allP.
+    move=> f f_in.
+    move/nthP in f_in.
+    destruct (f_in 0) as [i Hi Hf].
+    rewrite size_map in Hi.
+    rewrite (nth_map 0) // in Hf.
+    rewrite -Hf /= -(expn0 (nth 0 primes_m i)).
+    apply leq_pexp2l ; last by [].
+    apply prime_gt0.
+    apply (mem_nth 0) in Hi.
+    apply (mem_cons _ p) in Hi.
+    rewrite Hprimes_m mem_primes in Hi.
+    move/and3P in Hi.
+    by destruct Hi.
+  assert (0 < \prod_(j <- primes_n) j ^ logn j n) as prod_n_gt_0.
+    apply ltn_0_prod_f.
+    apply/allP.
+    move=> f f_in.
+    move/nthP in f_in.
+    destruct (f_in 0) as [i Hi Hf].
+    rewrite size_map in Hi.
+    rewrite (nth_map 0) // in Hf.
+    rewrite -Hf /= -(expn0 (nth 0 primes_n i)).
+    apply leq_pexp2l ; last by [].
+    apply prime_gt0.
+    apply (mem_nth 0) in Hi.
+    apply (mem_cons _ q) in Hi.
+    rewrite Hprimes_n mem_primes in Hi.
+    move/and3P in Hi.
+    by destruct Hi.
+  assert (primes_m = primes (\prod_(j <- primes_m) j ^ logn j m)) as Hprimes_prod_m.
+    apply eq_sorted with ltn ;
+      first by move ; apply ltn_trans.
+      by move ; apply anti_ltn.
+    pose proof (sorted_primes m) as primes_m_sorted.
+    rewrite -Hprimes_m /= in primes_m_sorted.
+    by apply path_sorted in primes_m_sorted.
+    apply sorted_primes.
+    apply uniq_perm.
+    pose proof (primes_uniq m) as primes_m_uniq.
+    rewrite -Hprimes_m /= in primes_m_uniq.
+    move/andP in primes_m_uniq.
+    by destruct primes_m_uniq.
+    apply primes_uniq.
+    move=> r.
+    rewrite logn_dvdn_prime_aux.
+    rewrite mem_big_eq.
+    apply eq_big_seq.
+    move=> s s_in.
+    apply (mem_cons _ p) in s_in.
+    rewrite Hprimes_m mem_primes in s_in.
+    move/and3P in s_in.
+    destruct s_in as [s_prime _ s_dvd_m].
+    destruct (s == r)eqn:s_eq_r.
+      move/eqP in s_eq_r.
+      subst.
+      rewrite primes_exp.
+      apply primes_prime in s_prime.
+      by rewrite s_prime mem_seq1 eq_refl.
+      rewrite logn_gt0 mem_primes.
+      by apply/and3P.
+      rewrite mem_primes.
+      destruct (prime r)eqn:r_prime ; last by [].
+      assert (0 < s ^ logn s m) as s_logn_gt_0 by
+        by rewrite -(expn0 s).
+      rewrite s_logn_gt_0 /=.
+      destruct (r %| s ^ logn s m)eqn:r_dvd_s_logn ; last by [].
+      pose proof r_dvd_s_logn as H0.
+      move/dvdn_pfactor in H0.
+      destruct (H0 s_prime) as [e e_le_logn r_eq_s_e] ; clear H0.
+      destruct e as [|[|e]].
+        rewrite expn0 in r_eq_s_e.
+        by rewrite r_eq_s_e in r_prime.
+        rewrite expn1 in r_eq_s_e.
+        by rewrite r_eq_s_e eq_refl in s_eq_r.
+        rewrite expnS in r_eq_s_e.
+        exfalso ; assert (~~ prime r) as r_not_prime ;
+          last by rewrite r_prime in r_not_prime.
+        apply/primePn ; right.
+        exists s ; last rewrite r_eq_s_e dvdn_mulr // dvdnn.
+        apply/andP ; split ; first by apply prime_gt1.
+        rewrite -(muln1 s) r_eq_s_e ltn_mul2l.
+        apply/andP ; split ; first by apply prime_gt0.
+        rewrite -(expn0 s) ltn_exp2l ; last by apply prime_gt1.
+        apply ltn0Sn.
+    move=> s s_in /=.
+      apply (mem_cons _ p) in s_in.
+      rewrite Hprimes_m mem_primes in s_in.
+      move/and3P in s_in.
+      destruct s_in as [s_prime _ _].
+      rewrite -(expn0 s) leq_exp2l //.
+      by apply prime_gt1.
+  assert (primes_n = primes (\prod_(j <- primes_n) j ^ logn j n)) as Hprimes_prod_n.
+    apply eq_sorted with ltn ;
+      first by move ; apply ltn_trans.
+      by move ; apply anti_ltn.
+    pose proof (sorted_primes n) as primes_n_sorted.
+    rewrite -Hprimes_n /= in primes_n_sorted.
+    by apply path_sorted in primes_n_sorted.
+    apply sorted_primes.
+    apply uniq_perm.
+    pose proof (primes_uniq n) as primes_n_uniq.
+    rewrite -Hprimes_n /= in primes_n_uniq.
+    move/andP in primes_n_uniq.
+    by destruct primes_n_uniq.
+    apply primes_uniq.
+    move=> r.
+    rewrite logn_dvdn_prime_aux.
+    rewrite mem_big_eq.
+    apply eq_big_seq.
+    move=> s s_in.
+    apply (mem_cons _ q) in s_in.
+    rewrite Hprimes_n mem_primes in s_in.
+    move/and3P in s_in.
+    destruct s_in as [s_prime _ s_dvd_n].
+    destruct (s == r)eqn:s_eq_r.
+      move/eqP in s_eq_r.
+      subst.
+      rewrite primes_exp.
+      apply primes_prime in s_prime.
+      by rewrite s_prime mem_seq1 eq_refl.
+      rewrite logn_gt0 mem_primes.
+      by apply/and3P.
+      rewrite mem_primes.
+      destruct (prime r)eqn:r_prime ; last by [].
+      assert (0 < s ^ logn s n) as s_logn_gt_0 by
+        by rewrite -(expn0 s).
+      rewrite s_logn_gt_0 /=.
+      destruct (r %| s ^ logn s n)eqn:r_dvd_s_logn ; last by [].
+      pose proof r_dvd_s_logn as H0.
+      move/dvdn_pfactor in H0.
+      destruct (H0 s_prime) as [e e_le_logn r_eq_s_e] ; clear H0.
+      destruct e as [|[|e]].
+        rewrite expn0 in r_eq_s_e.
+        by rewrite r_eq_s_e in r_prime.
+        rewrite expn1 in r_eq_s_e.
+        by rewrite r_eq_s_e eq_refl in s_eq_r.
+        rewrite expnS in r_eq_s_e.
+        exfalso ; assert (~~ prime r) as r_not_prime ;
+          last by rewrite r_prime in r_not_prime.
+        apply/primePn ; right.
+        exists s ; last rewrite r_eq_s_e dvdn_mulr // dvdnn.
+        apply/andP ; split ; first by apply prime_gt1.
+        rewrite -(muln1 s) r_eq_s_e ltn_mul2l.
+        apply/andP ; split ; first by apply prime_gt0.
+        rewrite -(expn0 s) ltn_exp2l ; last by apply prime_gt1.
+        apply ltn0Sn.
+    move=> s s_in /=.
+      apply (mem_cons _ q) in s_in.
+      rewrite Hprimes_n mem_primes in s_in.
+      move/and3P in s_in.
+      destruct s_in as [s_prime _ _].
+      rewrite -(expn0 s) leq_exp2l //.
+      by apply prime_gt1.
+  destruct (p == q)eqn:p_eq_q.
+  move/eqP in p_eq_q ; rewrite p_eq_q.
+  apply dvdn_mul.
+  rewrite dvdn_Pexp2l ; last by apply prime_gt1.
+  by apply H.
+  apply (IHprimes_m (\prod_(j <- primes_m) j ^ logn j m) Hprimes_prod_m prod_m_gt_0
+    (\prod_(j <- primes_n) j ^ logn j n) (primes_n) Hprimes_prod_n) ; first by [].
+  move=> s s_prime.
+  rewrite ?logn_prod_f.
+  rewrite (eq_big_seq (fun p => if p == s then logn p m else 0)).
+  assert (
+    \sum_(x <- primes_n) logn s (x ^ logn x n)
+    = \sum_(i <- primes_n) (if i == s then logn i n else 0)
+    ) as step ; last rewrite step ; last clear step.
+  rewrite (eq_big_seq (fun p => if p == s then logn p n else 0)) //.
+  move=> r r_in.
+    apply (mem_cons _ q) in r_in.
+    rewrite Hprimes_n mem_primes in r_in.
+    move/and3P in r_in.
+    destruct r_in as [r_prime _ r_dvd_n].
+    rewrite lognX (logn_prime s r_prime) eq_sym.
+    case: (r == s) ; by rewrite ?muln1 ?muln0.
+  destruct (s \in primes_m)eqn:s_in_primes_m ; first destruct (s \in primes_n)eqn:s_in_primes_n.
+    rewrite (big_rem _ s_in_primes_m) /= (big_rem _ s_in_primes_n) /= eq_refl.
+    apply leq_add ; first by apply H.
+    rewrite (eq_big_seq (fun p => 0)).
+    rewrite -(big_map_id _ _ (fun p => 0) _ predT) /=.
+    by rewrite map_const -sumnE sumn_nseq mul0n.
+    move=> r r_in.
+      destruct (r == s)eqn:r_eq_s ; last by [].
+      move/eqP in r_eq_s.
+      rewrite r_eq_s mem_rem_uniqF // in r_in.
+      pose proof (primes_uniq m) as uniq_primes_m.
+      rewrite -Hprimes_m /= in uniq_primes_m.
+      move/andP in uniq_primes_m.
+      by destruct uniq_primes_m.
+    exfalso.
+    destruct (s \in primes n)eqn:s_eq_q.
+    rewrite -Hprimes_n mem_head_or_behead s_in_primes_n orbF in s_eq_q.
+    move/eqP in s_eq_q.
+    rewrite s_eq_q in s_in_primes_m.
+    pose proof (primes_uniq m) as uniq_primes_m.
+    by rewrite -Hprimes_m cons_uniq p_eq_q  s_in_primes_m in uniq_primes_m.
+    rewrite -logn_gt0 in s_eq_q.
+    assert (s \in primes m) as s_in by
+      by rewrite -Hprimes_m ; by apply mem_cons.
+    rewrite leqNgt in s_eq_q.
+    assert (logn s n < 1) as H0 by
+      by destruct (logn s n < 1).
+    rewrite -logn_gt0 in s_in.
+    assert (0 < 0) ; last by [].
+    apply leq_trans with (logn s m) ; first by [].
+    rewrite ltnS in H0.
+    apply leq_trans with (logn s n) ; last by [].
+    by apply H.
+    rewrite (eq_big_seq (fun p => 0)).
+    rewrite -(big_map_id _ _ (fun p => 0) _ predT) /=.
+    by rewrite map_const -sumnE sumn_nseq mul0n.
+    move=> r r_in_primes_m.
+    destruct (r == s)eqn:r_eq_s ; last by [].
+    move/eqP in r_eq_s.
+    by rewrite r_eq_s s_in_primes_m in r_in_primes_m.
+    move=> r r_in_primes_m.
+    assert (r \in primes m) as r_in.
+      rewrite -Hprimes_m ; by apply mem_cons.
+    rewrite mem_primes in r_in.
+    move/and3P in r_in.
+    destruct r_in as [r_prime _ r_dvd_m].
+    destruct (r == s)eqn:r_eq_s.
+    move/eqP in r_eq_s.
+    by rewrite r_eq_s lognX lognn s_prime muln1.
+    by rewrite lognX (logn_prime s) // eq_sym r_eq_s muln0.
+  apply/allP.
+    move=> f f_in.
+    move/nthP in f_in.
+    destruct (f_in 0) as [i Hi Hf].
+    rewrite size_map in Hi.
+    rewrite (nth_map 0) // in Hf.
+    remember (nth 0 primes_n i) as r eqn:Heqr.
+    rewrite -Hf /=.
+    rewrite -(expn0 r).
+    apply leq_pexp2l ; last by [].
+    apply (mem_nth 0) in Hi.
+    rewrite -Heqr in Hi.
+    apply (mem_cons _ q) in Hi.
+    rewrite Hprimes_n in Hi.
+    apply prime_gt0.
+    rewrite mem_primes in Hi.
+    move/and3P in Hi.
+    by destruct Hi.
+  apply/allP.
+    move=> f f_in.
+    move/nthP in f_in.
+    destruct (f_in 0) as [i Hi Hf].
+    rewrite size_map in Hi.
+    rewrite (nth_map 0) // in Hf.
+    remember (nth 0 primes_m i) as r eqn:Heqr.
+    rewrite -Hf /=.
+    rewrite -(expn0 r).
+    apply leq_pexp2l ; last by [].
+    apply (mem_nth 0) in Hi.
+    rewrite -Heqr in Hi.
+    apply (mem_cons _ p) in Hi.
+    rewrite Hprimes_m in Hi.
+    apply prime_gt0.
+    rewrite mem_primes in Hi.
+    move/and3P in Hi.
+    by destruct Hi.
+  rewrite /= in q_le_p.
+  apply dvdn_mull.
+  assert (
+    \prod_(p <- primes m) p ^ logn p m
+    = p ^ logn p m * \prod_(j <- primes_m) j ^ logn j m
+    ) as step ; last rewrite -step ; last clear step.
+    by rewrite -Hprimes_m big_cons.
+  assert (
+    m =\prod_(p0 <- primes m) p0 ^ logn p0 m
+    ) as step ; last rewrite -step ; last clear step.
+  rewrite {1}(prod_prime_decomp m_gt_0) prime_decompE big_map //.
+  apply (IHprimes_n (\prod_(j <- primes_n) j ^ logn j n) Hprimes_prod_n) ; first by [].
+  move=> s s_prime.
+  rewrite logn_prod_f.
+  destruct (s \in primes n)eqn:s_in.
+  pose proof s_in as s_dvd_n.
+  rewrite -Hprimes_n mem_head_or_behead in s_in.
+  rewrite mem_primes in s_dvd_n.
+  move/and3P in s_dvd_n.
+  destruct s_dvd_n as [_ _ d_dvd_n].
+  move/orP in s_in.
+  destruct s_in as [s_eq_q|s_in].
+  move/eqP in s_eq_q.
+  subst.
+  apply leq_trans with 0 ; last by [].
+  rewrite leqNgt.
+  apply/negP.
+  move=> pdiv_n_in_primes_m.
+  rewrite logn_gt0 mem_primes in pdiv_n_in_primes_m.
+  move/and3P in pdiv_n_in_primes_m.
+  destruct pdiv_n_in_primes_m as [_ _ pdiv_n_dvd_m].
+  rewrite ltnNge in q_le_p.
+  move/negP in q_le_p.
+  apply: q_le_p.
+  apply pdiv_min_dvd ; last by [].
+  by apply prime_gt1.
+  rewrite (big_rem _ s_in) /= -(addn0 (logn s m)).
+  apply leq_add ; last by [].
+  rewrite lognX (logn_prime s s_prime) eq_refl muln1.
+  by apply H.
+  apply leq_trans with 0 ; last by [].
+  rewrite leqNgt.
+  apply/negP.
+  move=> s_dvd_m.
+  assert (0 < logn s n) as s_dvd_n.
+    apply leq_trans with (logn s m) ; first by [].
+    by apply H.
+  rewrite logn_gt0 in s_dvd_n.
+  by rewrite s_dvd_n in s_in.
+  apply/allP.
+    move=> f f_in.
+    move/nthP in f_in.
+    destruct (f_in 0) as [i Hi Hf].
+    rewrite size_map in Hi.
+    rewrite (nth_map 0) // in Hf.
+    remember (nth 0 primes_n i) as r eqn:Heqr.
+    rewrite -Hf /=.
+    rewrite -(expn0 r).
+    apply leq_pexp2l ; last by [].
+    apply (mem_nth 0) in Hi.
+    rewrite -Heqr in Hi.
+    apply (mem_cons _ q) in Hi.
+    rewrite Hprimes_n in Hi.
+    apply prime_gt0.
+    rewrite mem_primes in Hi.
+    move/and3P in Hi.
+    by destruct Hi.
+Qed.
+
+Lemma logn_dvdn_prime :
+  forall m n, 0 < m -> 0 < n
+  -> (forall p, prime p -> logn p m <= logn p n)
+  -> m %| n.
+Proof.
+  move=> m n m_gt_0 n_gt_0 H.
+  assert (primes m = primes m) as primes_m by by [].
+  assert (primes n = primes n) as primes_n by by [].
+  apply (logn_dvdn_prime_aux3 m (primes m) primes_m m_gt_0 n (primes n) primes_n n_gt_0 H).
+Qed.
+
+End logn_dvdn_prime.
+
+Lemma logn_leq_dvdn :
+  forall m n p, 0 < m -> 0 < n
+  -> m %| n
+  -> logn p m <= logn p n.
+Proof.
+  move=> m n p m_gt_0 n_gt_0 m_dvd_n.
+  destruct (prime p)eqn:p_prime ; last unfold logn ; last by rewrite p_prime.
+  rewrite ?logn_count_dvd //.
+  apply leq_trans with (\sum_(1 <= k < m) (p ^ k %| m) + \sum_(m <= k < n) (p ^ k %| m)) ;
+    first apply leq_addr.
+  rewrite -big_cat_nat //=.
+  move: (index_iota 1 n) ; elim=> [|a s IHs] ; first by rewrite big_nil.
+  rewrite ?big_cons.
+  apply leq_add ; last by [].
+  destruct (p ^ a %| n)eqn:p_a_dvd_n ; first by case: (p ^ a %| m).
+  destruct (p ^ a %| m)eqn:p_a_dvd_m ; last by [].
+  assert (p ^ a %| n) as absurd by by apply dvdn_trans with m.
+  by rewrite absurd in p_a_dvd_n.
+  by apply dvdn_leq.
+Qed.
+
+
+Lemma minn_or : forall m n, (minn m n == m) || (minn m n == n).
+Proof.
+  move=> m n.
+  pose proof (leq_total m n) as H.
+  move/orP in H.
+  apply/orP.
+  destruct H ; [left | right] ; apply/eqP.
+  by apply/minn_idPl.
+  by apply/minn_idPr.
+Qed.
+
+Lemma gcdn_div :
+  forall m n p, 0 < p -> p %| m -> p %| n
+  -> gcdn (m %/ p) (n %/ p) = gcdn m n %/ p.
+Proof.
+  move=> m n p p_gt_0 p_dvd_m p_dvd_n.
+  apply gcdn_def.
+  rewrite dvdn_divRL // mulnC muln_divA ; last by rewrite dvdn_gcd p_dvd_m p_dvd_n.
+  by rewrite mulnC mulnK // dvdn_gcdl.
+  rewrite dvdn_divRL // mulnC muln_divA ; last by rewrite dvdn_gcd p_dvd_m p_dvd_n.
+  by rewrite mulnC mulnK // dvdn_gcdr.
+  move=> d d_dvd_m_p d_dvd_n_p.
+  move/dvdnP in d_dvd_m_p ; destruct d_dvd_m_p as [k Hk].
+  move/dvdnP in d_dvd_n_p ; destruct d_dvd_n_p as [l Hl].
+  rewrite dvdn_divRL ; last by rewrite dvdn_gcd p_dvd_m p_dvd_n.
+  move/eqP in Hk.
+  move/eqP in Hl.
+  rewrite -?eqn_mul // in Hk, Hl.
+  move/eqP in Hk.
+  move/eqP in Hl.
+  rewrite dvdn_gcd.
+  apply/andP ; split ; apply/dvdnP ;
+    [exists k ; rewrite Hk | exists l ; rewrite Hl] ; ring.
+Qed.
+
+Lemma strong_induction :
+  forall (P : nat -> Prop),
+  P 0
+  -> (forall n, (forall m, m < n -> P m) -> P n)
+  -> forall n, P n.
+Admitted.
+
+Lemma subn_minl : left_distributive subn minn.
+Proof.
+  elim=> [|m IHm] ; elim=> [|n IHn] ; elim=> [|p IHp] //.
+    by rewrite ?sub0n min0n.
+    by rewrite subn0.
+    by rewrite minnSS -add1n -?(add1n m) -?(add1n n) -?(add1n p) ?subnDl.
+Qed.
+
+Lemma logn_gcdn :
+  forall m n p, 0 < m -> 0 < n
+  -> logn p (gcdn m n) = minn (logn p m) (logn p n).
+Proof.
+  apply (strong_induction (fun m => forall n p : nat, 0 < m -> 0 < n -> logn p (gcdn m n) = minn (logn p m) (logn p n))) ; first by [].
+  move=> m IHm n p m_gt_0 n_gt_0.
+  destruct (prime p)eqn:p_prime ; last unfold logn ; last by rewrite p_prime.
+  assert (0 < gcdn m n) as gcd_m_n_gt_0 by by rewrite gcdn_gt0 m_gt_0.
+  pose proof (minn_or (logn p m) (logn p n)) as H.
+  move/orP in H ; destruct H ; move/eqP in H ; rewrite H.
+  rewrite lognE p_prime gcd_m_n_gt_0 /=.
+  destruct (p %| gcdn m n)eqn:p_dvd_gcd_m_n.
+  apply Logic.eq_sym.
+  rewrite lognE p_prime m_gt_0 /=.
+  rewrite dvdn_gcd in p_dvd_gcd_m_n.
+  move/andP in p_dvd_gcd_m_n.
+  destruct p_dvd_gcd_m_n as [p_dvd_m p_dvd_n].
+  rewrite p_dvd_m.
+  congr S.
+  rewrite -gcdn_div // ; last by apply prime_gt0.
+  rewrite IHm ; last rewrite ltn_divRL // mul0n ; last rewrite ltn_divRL // mul0n ;
+    last apply ltn_Pdiv ; last by [] ; last by apply prime_gt1.
+  by rewrite ? logn_div // -subn_minl H.
+  apply/eqP.
+  rewrite eq_sym -leqn0 leqNgt.
+  apply/negP.
+  move=> p_dvd_m.
+  apply negbT in p_dvd_gcd_m_n.
+  rewrite dvdn_gcd negb_and in p_dvd_gcd_m_n.
+  move/orP in p_dvd_gcd_m_n.
+  pose proof p_dvd_m as logn_p_m_gt_0.
+  rewrite logn_gt0 mem_primes in p_dvd_m.
+  move/and3P in p_dvd_m.
+  destruct p_dvd_m as [_ _ p_div_m].
+  destruct p_dvd_gcd_m_n as [p_dvd|p_dvd] ; move/negP in p_dvd ; apply p_dvd ; first by [].
+  assert (0 < logn p n) as p_dvd_n.
+    apply ltn_leq_trans with (logn p m) ; first by [].
+    by rewrite -H geq_minr.
+  rewrite logn_gt0 mem_primes in p_dvd_n.
+  move/and3P in p_dvd_n.
+  by destruct p_dvd_n.
+  rewrite lognE p_prime gcd_m_n_gt_0 /=.
+  destruct (p %| gcdn m n)eqn:p_dvd_gcd_m_n.
+  apply Logic.eq_sym.
+  rewrite lognE p_prime n_gt_0 /=.
+  rewrite dvdn_gcd in p_dvd_gcd_m_n.
+  move/andP in p_dvd_gcd_m_n.
+  destruct p_dvd_gcd_m_n as [p_dvd_m p_dvd_n].
+  rewrite p_dvd_n.
+  congr S.
+  rewrite -gcdn_div // ; last by apply prime_gt0.
+  rewrite IHm ; last rewrite ltn_divRL // mul0n ; last rewrite ltn_divRL // mul0n ;
+    last apply ltn_Pdiv ; last by [] ; last by apply prime_gt1.
+  by rewrite ? logn_div // -subn_minl H.
+  apply/eqP.
+  rewrite eq_sym -leqn0 leqNgt.
+  apply/negP.
+  move=> p_dvd_n.
+  apply negbT in p_dvd_gcd_m_n.
+  rewrite dvdn_gcd negb_and in p_dvd_gcd_m_n.
+  move/orP in p_dvd_gcd_m_n.
+  pose proof p_dvd_n as logn_p_m_gt_0.
+  rewrite logn_gt0 mem_primes in p_dvd_n.
+  move/and3P in p_dvd_n.
+  destruct p_dvd_n as [_ _ p_div_n].
+  destruct p_dvd_gcd_m_n as [p_dvd|p_dvd] ; move/negP in p_dvd ; apply p_dvd ; last by [].
+  assert (0 < logn p m) as p_dvd_m.
+    apply ltn_leq_trans with (logn p n) ; first by [].
+    by rewrite -H geq_minl.
+  rewrite logn_gt0 mem_primes in p_dvd_m.
+  move/and3P in p_dvd_m.
+  by destruct p_dvd_m.
+Qed.
+
+
+Section divisors_coprime.
+
+Local Lemma divisors_coprime_aux_aux :
+  forall p n, prime p -> 0 < n
+  -> logn p n = 0
+  -> ~~ (p %| n).
+Proof.
+  move=> p n p_prime n_gt_0 logn_p_n_eq_0.
+  apply/negP.
+  move=> p_dvd_n.
+  rewrite lognE in logn_p_n_eq_0.
+  by rewrite p_prime p_dvd_n n_gt_0 /= in logn_p_n_eq_0.
+Qed.
+
+Local Lemma divisors_coprime_aux :
+  forall m n, 0 < m -> 0 < n
+  -> coprime m n
+  -> forall d11 d21 d12 d22,
+     d11 %| m -> d21 %| n -> d12 %| m -> d22 %| n
+  -> d11 * d21 == d12 * d22 = (d11 == d12) && (d21 == d22).
+Proof.
+  move=> m n m_gt_0 n_gt_0 m_coprime_n
+         d11       d21       d12       d22
+         d11_dvd_m d21_dvd_n d12_dvd_m d22_dvd_n.
+  assert (d11 * d21 == d12 * d22 == (d11 == d12) && (d21 == d22)) as H ; last by move/eqP in H.
+  apply/equiv_eqP.
+  apply/idP.
+  apply/idP.
+  split.
+  pose proof (dvdn_gt0 m_gt_0 d11_dvd_m) as d11_gt_0.
+  pose proof (dvdn_gt0 n_gt_0 d21_dvd_n) as d21_gt_0.
+  pose proof (dvdn_gt0 m_gt_0 d12_dvd_m) as d12_gt_0.
+  pose proof (dvdn_gt0 n_gt_0 d22_dvd_n) as d22_gt_0.
+  move=> d11_d21_eq_d12_d22.
+  assert (coprime d11 d21) as d11_coprime_d21 by
+    by [apply coprime_dvdl with m ; first by [] ; by apply coprime_dvdr with n].
+  assert (coprime d12 d22) as d12_coprime_d22 by
+    by [apply coprime_dvdl with m ; first by [] ; by apply coprime_dvdr with n].
+  assert (coprime d11 d22) as d11_coprime_d22 by
+    by [apply coprime_dvdl with m ; first by [] ; by apply coprime_dvdr with n].
+  assert (coprime d12 d21) as d12_coprime_d21 by
+    by [apply coprime_dvdl with m ; first by [] ; by apply coprime_dvdr with n].
+  apply/andP ; split ; apply/eqP.
+  apply logn_eq_prime ; first by [] ; first by [].
+  move=> p p_prime.
+  assert (logn p (d11 * d21) = logn p (d12 * d22)) as H by
+    by [move/eqP in d11_d21_eq_d12_d22 ; rewrite d11_d21_eq_d12_d22].
+  rewrite ?lognM // in H.
+  pose proof (coprime_logn_or d11 d21 d11_gt_0 d21_gt_0 d11_coprime_d21 p) as H1.
+  move/orP in H1.
+  pose proof (coprime_logn_or d12 d22 d12_gt_0 d22_gt_0 d12_coprime_d22 p) as H2.
+  move/orP in H2.
+  pose proof (coprime_logn_or d11 d22 d11_gt_0 d22_gt_0 d11_coprime_d22 p) as H3.
+  move/orP in H3.
+  pose proof (coprime_logn_or d12 d21 d12_gt_0 d21_gt_0 d12_coprime_d21 p) as H4.
+  move/orP in H4.
+  destruct   H1 as [H1|H1] ; move/eqP in H1 ; destruct H2 as [H2|H2] ; move/eqP in H2 ;
+    destruct H3 as [H3|H3] ; move/eqP in H3 ; destruct H4 as [H4|H4] ; move/eqP in H4 ;
+    rewrite ?H1 ?H2 ?H3 ?H4 ?addn0 ?add0n // in H ; rewrite ?H1 ?H2 ?H3 ?H4 //.
+  apply logn_eq_prime ; first by [] ; first by [].
+  move=> p p_prime.
+  assert (logn p (d11 * d21) = logn p (d12 * d22)) as H by
+    by [move/eqP in d11_d21_eq_d12_d22 ; rewrite d11_d21_eq_d12_d22].
+  rewrite ?lognM // in H.
+  pose proof (coprime_logn_or d11 d21 d11_gt_0 d21_gt_0 d11_coprime_d21 p) as H1.
+  move/orP in H1.
+  pose proof (coprime_logn_or d12 d22 d12_gt_0 d22_gt_0 d12_coprime_d22 p) as H2.
+  move/orP in H2.
+  pose proof (coprime_logn_or d11 d22 d11_gt_0 d22_gt_0 d11_coprime_d22 p) as H3.
+  move/orP in H3.
+  pose proof (coprime_logn_or d12 d21 d12_gt_0 d21_gt_0 d12_coprime_d21 p) as H4.
+  move/orP in H4.
+  destruct   H1 as [H1|H1] ; move/eqP in H1 ; destruct H2 as [H2|H2] ; move/eqP in H2 ;
+    destruct H3 as [H3|H3] ; move/eqP in H3 ; destruct H4 as [H4|H4] ; move/eqP in H4 ;
+    rewrite ?H1 ?H2 ?H3 ?H4 ?addn0 ?add0n // in H ; rewrite ?H1 ?H2 ?H3 ?H4 //.
+  move=> H.
+  move/andP in H.
+  destruct H as [d11_eq_d12 d21_eq_d22].
+  move/eqP in d11_eq_d12.
+  move/eqP in d21_eq_d22.
+  by rewrite d11_eq_d12 d21_eq_d22.
+Qed.
+
+Lemma divisors_coprime :
+  forall m n, 0 < m -> 0 < n
+  -> coprime m n
+  -> perm_eq (divisors (m * n)) [seq (d1 * d2) | d1 <- divisors m, d2 <- divisors n].
+Proof.
+  move=> m n m_gt_0 n_gt_0 m_coprime_n.
+  apply uniq_perm ; first apply divisors_uniq.
+  apply/(uniqP 0).
+  move=> i j i_in j_in H.
+  rewrite ?nth_flatten /= in H.
+  remember ([seq [seq d1 * d2 | d2 <- divisors n] | d1 <- divisors m]) as prod_divisors eqn:Heq.
+  assert (shape prod_divisors = nseq (size (divisors m)) (size (divisors n))).
+    rewrite Heq.
+    unfold shape.
+    rewrite -map_comp.
+    assert ((size \o (fun d1 : nat => [seq d1 * d2 | d2 <- divisors n])) =1 (fun d => size (divisors n))) as H0.
+      move=> d //= ; by rewrite size_map.
+    by rewrite (eq_map H0) map_const.
+  remember (reshape_index  (shape prod_divisors) i) as qi eqn:Heqqi.
+  remember (reshape_offset (shape prod_divisors) i) as ri eqn:Heqri.
+  remember (reshape_index  (shape prod_divisors) j) as qj eqn:Heqqj.
+  remember (reshape_offset (shape prod_divisors) j) as rj eqn:Heqrj.
+  rewrite ?H0 in Heqqi, Heqri, Heqqj, Heqrj.
+  remember (nth 0 (divisors m) qi) as d11 eqn:Heqd11.
+  remember (nth 0 (divisors n) ri) as d21 eqn:Heqd21.
+  remember (nth 0 (divisors m) qj) as d12 eqn:Heqd12.
+  remember (nth 0 (divisors n) rj) as d22 eqn:Heqd22.
+  rewrite ?size_flatten ?H0 in i_in, j_in.
+  assert (qi < size (divisors m)) as Hqi.
+    rewrite -(size_nseq (size (divisors m)) (size (divisors n))) Heqqi.
+    by apply reshape_indexP.
+  assert (ri < size (divisors n)) as Hri.
+    assert (size (divisors n) = if qi < size (divisors m) then size (divisors n) else 0) as H1 by
+      by rewrite Hqi.
+    rewrite H1 -nth_nseq Heqqi Heqri.
+    by apply reshape_offsetP.
+  assert (qj < size (divisors m)) as Hqj.
+    rewrite -(size_nseq (size (divisors m)) (size (divisors n))) Heqqj.
+    by apply reshape_indexP.
+  assert (rj < size (divisors n)) as Hrj.
+    assert (size (divisors n) = if qj < size (divisors m) then size (divisors n) else 0) as H1 by
+      by rewrite Hqj.
+    rewrite H1 -nth_nseq Heqqj Heqrj.
+    by apply reshape_offsetP.
+  rewrite -(reshape_indexK (shape prod_divisors) i) -(reshape_indexK (shape prod_divisors) j).
+  rewrite ?Heq ?(nth_map 0) // in H.
+  rewrite -Heqd11 -Heqd21 -Heqd12 -Heqd22 in H.
+  assert (d11 %| m) as d11_dvd_m.
+    rewrite mem_divisors_dvdn // Heqd11.
+    by apply mem_nth.
+  assert (d21 %| n) as d21_dvd_n.
+    rewrite mem_divisors_dvdn // Heqd21.
+    by apply mem_nth.
+  assert (d12 %| m) as d12_dvd_m.
+    rewrite mem_divisors_dvdn // Heqd12.
+    by apply mem_nth.
+  assert (d22 %| n) as d22_dvd_n.
+    rewrite mem_divisors_dvdn // Heqd22.
+    by apply mem_nth.
+  rewrite ?H0 -Heqqi -Heqri -Heqqj -Heqrj.
+  move/eqP in H.
+  rewrite (divisors_coprime_aux m n) // in H.
+  move/andP in H.
+  destruct H as [d11_eq_d12 d21_eq_d22].
+  rewrite Heqd11 Heqd12 nth_uniq // in d11_eq_d12 ; last apply divisors_uniq.
+  rewrite Heqd21 Heqd22 nth_uniq // in d21_eq_d22 ; last apply divisors_uniq.
+  move/eqP in d11_eq_d12.
+  move/eqP in d21_eq_d22.
+  by rewrite d11_eq_d12 d21_eq_d22.
+  assert (0 < m * n) as m_n_gt_0.
+    rewrite -(muln0 0).
+    by apply ltn_mul.
+  move=> d.
+  rewrite -dvdn_divisors //.
+  assert ((d %| m * n) == (d \in [seq d1 * d2 | d1 <- divisors m, d2 <- divisors n])) as H0 ; last by move/eqP in H0.
+  apply/equiv_eqP.
+  apply/idP.
+  apply/idP.
+  split.
+  move=> d_dvd_m_n.
+    assert (0 < d) as d_gt_0 by
+      by apply dvdn_gt0 with (m * n).
+  apply/flatten_mapP.
+  exists (gcdn m d).
+    rewrite -dvdn_divisors //.
+    apply dvdn_gcdl.
+  apply/mapP.
+  exists (gcdn n d).
+    rewrite -dvdn_divisors //.
+    apply dvdn_gcdl.
+  assert (0 < gcdn m d) as gcd_m_d_gt_0 by by rewrite gcdn_gt0 m_gt_0.
+  assert (0 < gcdn n d) as gcd_n_d_gt_0 by by rewrite gcdn_gt0 n_gt_0.
+  assert (d = gcdn (m * n) d) as d_eq_gcdn_m_n_d.
+    apply Logic.eq_sym.
+    by apply/gcdn_idPr.
+  rewrite {1}d_eq_gcdn_m_n_d.
+  apply logn_eq_prime ; first by rewrite -d_eq_gcdn_m_n_d.
+    rewrite -(muln0 0) ; by apply ltn_mul.
+  move=> p p_prime.
+  rewrite ?logn_gcdn // ?lognM // ?logn_gcdn //.
+  pose proof (coprime_logn_or _ _ m_gt_0 n_gt_0 m_coprime_n p) as H.
+  move/orP in H.
+  destruct H ; move/eqP in H ; rewrite H.
+    by rewrite min0n ?add0n.
+    by rewrite min0n ?addn0.
+  move=> d_in.
+  move/flatten_mapP in d_in.
+  destruct d_in as [d1 d1_in d_in].
+  move/mapP in d_in.
+  destruct d_in as [d2 d2_in d_eq_d1_d2].
+  rewrite d_eq_d1_d2.
+  apply dvdn_mul ; by rewrite mem_divisors_dvdn.
+Qed.
+
+End divisors_coprime.
