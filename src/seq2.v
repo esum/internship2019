@@ -1,4 +1,4 @@
-From mathcomp Require Import ssreflect ssrfun eqtype seq ssrbool.
+From mathcomp Require Import ssreflect ssrfun eqtype seq ssrbool bigop.
 
 
 Lemma mem_head_or_behead {T : eqType} : forall (x : T) h l, x \in h::l = (x == h) || (x \in l).
@@ -36,4 +36,39 @@ Lemma zip_map {T1 T2 R1 R2 : Type} :
 Proof.
   move=> f g ; elim=> [|h1 s1 IHs1] [|h2 s2] //.
   by rewrite /= IHs1.
+Qed.
+
+Lemma eq_map_eq {T1 T2 : Type} :
+  forall {f g : T1 -> T2} {s1 s2 : seq T1}, f =1 g
+  -> s1 = s2
+  -> [seq f x | x <- s1] = [seq g x | x <- s2].
+Proof.
+  move=> f g s1 s2 f_eq_g s1_eq_s2.
+  rewrite s1_eq_s2.
+  by apply eq_map.
+Qed.
+
+Lemma eq_in_map_eq {T1 : eqType} {T2 : Type} :
+  forall {f g : T1 -> T2} {s1 s2 : seq T1},
+  {in s1, f =1 g}
+  -> s1 = s2
+  -> [seq f x | x <- s1] = [seq g x | x <- s2].
+Proof.
+  move=> f g s1 s2 f_eq_g s1_eq_s2.
+  rewrite -s1_eq_s2.
+  by apply eq_in_map.
+Qed.
+
+Lemma map_const {T1 T2 : Type} :
+  forall {s : seq T1} {x : T2}, [seq x | _ <- s] = nseq (size s) x.
+Proof.
+    by elim=> [|h s IHs] x // ; rewrite /= IHs.
+Qed.
+
+Lemma mem_big_eq {T : eqType} :
+  forall {x : T} {s}, x \in s = \big[orb/false]_(y <- s) (y == x).
+Proof.
+  move=> x ; elim=> [|h s IHs] ;
+    first by rewrite big_nil.
+  by rewrite big_cons mem_head_or_behead /= IHs eq_sym.
 Qed.
