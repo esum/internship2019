@@ -1,72 +1,26 @@
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq prime div.
 From mathcomp Require Import path fintype bigop.
+From mathcomp Require Import ssralg ssrint.
 Add LoadPath "~/git/git.graillo.tf/stage/2019-06/src".
-Require Import seq2 ssrz arith primes_induction.
+Require Import seq2 arith primes_induction.
 
 
-Definition sumz := foldr addz (Znn 0).
+Import intZmod.
+Import intRing.
 
+Local Open Scope ring_scope.
+Local Open Scope int_scope.
+Bind Scope ring_scope with int.
 
-Notation "\sumz_ ( i <- r | P ) F" :=
-  (\big[addz/Znn 0]_(i <- r | P%B) F)
-  (at level 41, F at level 41, i, r at level 50).
+Import GRing.
 
-Notation "\sumz_ ( i <- r ) F" := (BigOp.bigop (Znn 0) r (fun i => BigBody i addz true F))
-  (at level 41, F at level 41, i, r at level 50).
-
-Notation "\sumz_ ( d %| n ) F" := (\sumz_(d <- divisors n) F)
+Notation "\sum_ ( d %| n ) F" := (\sum_(d <- divisors n) F)
   (at level 41, F at level 41, d at level 50).
-
-Notation "\sumz_ ( m <= i < n | P ) F" := (BigOp.bigop (Znn 0) (index_iota m n) (fun i : nat => BigBody i addz P%B F))
-  (at level 41, F at level 41, i, m, n at level 50).
-
-
-Canonical addz_monoid := Monoid.Law addzA add0z addz0.
-Canonical addz_comoid := Monoid.ComLaw addzC.
-
-Lemma sumzE : forall r, sumz r = \sumz_(i <- r) i.
-Proof.
-  elim=> [|h r IHr] ; rewrite BigOp.bigopE //.
-Qed.
-
-Lemma sumzDr {T : Type} : forall a f (s : seq T),
-  \sumz_(x <- s) mulz a (f x)
-  = mulz a (\sumz_(x <- s) f x).
-Proof.
-  move=> a f ; elim=> [|h s IHs] ; rewrite BigOp.bigopE /= ;
-    first by rewrite mulz0.
-  by rewrite -BigOp.bigopE IHs mulzDr.
-Qed.
-
-Lemma sumzDl {T : Type} : forall a f (s : seq T),
-  \sumz_(x <- s) mulz (f x) a
-  = mulz (\sumz_(x <- s) f x) a.
-Proof.
-  move=> a f s ;
-    rewrite mulzC -sumzDr.
-  apply eq_big ; first by [] ;
-  move=> x _ ;
-    by rewrite mulzC.
-Qed.
-
-Lemma sumz0 {T : Type} :
-  forall f (s : seq T), all (eq_op (Znn 0)) [seq f x | x <- s]
-  -> \sumz_(x <- s) f x = Znn 0.
-Proof.
-  move=> f ; elim=> [|h s IHs] ; move=> all_eq_0 ; rewrite BigOp.bigopE //=.
-  rewrite /= in all_eq_0.
-  move/andP in all_eq_0.
-  destruct all_eq_0 as [f_h_eq_0 all_eq_0].
-  move/eqP in f_h_eq_0.
-  rewrite -f_h_eq_0 add0z -BigOp.bigopE.
-  by apply: IHs.
-Qed.
-
 
 
 Lemma sumz_div_pred :
-  forall f n, 0 < n
-  -> \sumz_(d %| n) f d = \sumz_(1 <= d < n.+1 | d %| n) f d.
+  forall (f : nat -> int) n, 0 < n
+  -> \sum_(d %| n) f d = \sum_(1 <= k < n.+1 | k %| n) f k.
 Proof.
   move=> f n n_gt_0.
   apply/eqP.
@@ -87,20 +41,20 @@ Proof.
 Qed.
 
 Lemma sumz_kronecker {T : eqType} : forall f (y : T) (s : seq T),
-  \sumz_(x <- s) mulz (f x) (Znn (eq_op y x))
-  = \sumz_(x <- s | eq_op y x) f x.
+  \sum_(x <- s) (f x) * (Posz (eq_op y x))
+  = \sum_(x <- s | eq_op y x) f x.
 Proof.
   move=> f y ; elim=> [|h s IHs] ;
     rewrite BigOp.bigopE //=.
   rewrite -BigOp.bigopE IHs.
   case (y == h).
-  by rewrite mulz1.
-  by rewrite mulz0 add0z.
+  by rewrite mulr1.
+  by rewrite mulr0 add0r.
 Qed.
 
 Lemma sumz_div_inv :
-  forall f n, 0 < n
-  -> \sumz_(d %| n) f d = \sumz_(d %| n) f (n %/ d).
+  forall (f : nat -> int) n, 0 < n
+  -> \sum_(d %| n) f d = \sum_(d %| n) f (n %/ d).
 Proof.
   move=> f n n_gt_0.
   rewrite -(big_map (fun d => n %/ d) predT f).
@@ -127,18 +81,18 @@ Proof.
 Qed.
 
 Lemma sumz_div_mul :
-  forall f m n, 0 < m -> 0 < n
+  forall (f : nat -> int) m n, 0 < m -> 0 < n
   -> coprime m n
-  -> \sumz_(d %| m * n) f d = \sumz_(d1 %| m) (\sumz_(d2 %| n) f (d1 * d2)).
+  -> \sum_(d %| m * n) f d = \sum_(d1 %| m) (\sum_(d2 %| n) f (d1 * d2)%N).
 Proof.
   move=> f m n m_gt_0 n_gt_0 m_coprime_n.
   apply/eqP ; rewrite eq_sym.
   assert (
-    \sumz_(d1 %| m) \sumz_(d2 %| n) f (d1 * d2)
-    = \sumz_(d <- [seq (d1, d2) | d1 <- divisors m, d2 <- divisors n]) f (d.1 * d.2)
+    \sum_(d1 %| m) \sum_(d2 %| n) f (d1 * d2)%N
+    = \sum_(d <- [seq (d1, d2) | d1 <- divisors m, d2 <- divisors n]) f (d.1 * d.2)%N
     ) as step by by rewrite big_allpairs.
   rewrite step.
-  rewrite -(big_map (fun d => d.1 * d.2) predT).
+  rewrite -(big_map (fun d => d.1 * d.2)%N predT).
   apply/eqP.
   apply perm_big.
   rewrite perm_sym.
@@ -166,16 +120,16 @@ Proof.
 Qed.
 
 Lemma sumz_div_div :
-  forall f n, 0 < n ->
-  \sumz_(d1 %| n) \sumz_(d2 %| d1) f (n %/ d1) d2
-  = \sumz_(d2 %| n) \sumz_(d %| n %/ d2) f d d2.
+  forall (f : nat -> nat -> int) n, 0 < n ->
+  \sum_(d1 %| n) \sum_(d2 %| d1) f (n %/ d1) d2
+  = \sum_(d2 %| n) \sum_(d %| n %/ d2) f d d2.
 Proof.
   move=> f n n_gt_0.
-  rewrite (eq_big_seq (fun d1 => \sumz_(1 <= d2 < n.+1 | (d2 %| d1) && (d2 <= d1)) f (n %/ d1) d2)).
+  rewrite (eq_big_seq (fun d1 => \sum_(1 <= d2 < n.+1 | (d2 %| d1) && (d2 <= d1)) f (n %/ d1) d2)).
   rewrite sumz_div_pred //.
   rewrite (exchange_big_dep_nat (fun d => d %| n)) /=.
   rewrite -sumz_div_pred //.
-  apply (eq_big_seq (fun d2=> \sumz_ (d %| n %/ d2) f d d2)).
+  apply (eq_big_seq (fun d2=> \sum_ (d %| n %/ d2) f d d2)).
   move=> d2 d2_dvd_n.
     rewrite -dvdn_divisors // in d2_dvd_n.
     assert (d2 > 0) as d2_gt_0 by by apply dvdn_gt0 with n.
@@ -185,12 +139,12 @@ Proof.
     apply/eqP.
     rewrite eq_sym (big_nat_widen _ _ n.+1).
     rewrite (eq_in_big (fun d => d %| n %/ d2) (fun d => f ((n %/ d2) %/ d) d2)) //.
-    remember (\sumz_ (i <- index_iota 1 n.+1 | i %| n %/ d2) f ((n %/ d2) %/ i) d2) as x eqn:Heqx.
+    remember (\sum_ (i <- index_iota 1 n.+1 | i %| n %/ d2) f ((n %/ d2) %/ i) d2) as x eqn:Heqx.
     rewrite -Heqx (eq_in_big (fun d => (d %| n) && (d2 %| d)) (fun d => f (n %/ d) d2)) //= ?Heqx; clear x Heqx.
     rewrite -big_filter eq_sym -big_filter.
     assert (
-      \sumz_ (i <- [seq i <- index_iota 1 n.+1 | i %| n %/ d2]) f ((n %/ d2) %/ i) d2
-      = \sumz_(d <- [seq d2 * d | d <- index_iota 1 n.+1 & d %| n %/ d2]) f (n %/ d) d2
+      \sum_ (i <- [seq i <- index_iota 1 n.+1 | i %| n %/ d2]) f ((n %/ d2) %/ i) d2
+      = \sum_(d <- [seq (d2 * d)%N | d <- index_iota 1 n.+1 & d %| n %/ d2]) f (n %/ d) d2
       ) as step.
       rewrite big_map.
       apply eq_big ; first by [].
@@ -204,14 +158,14 @@ Proof.
       move ; by apply anti_leq.
     apply sorted_filter ; first by [move=> ? ? ? ; apply leq_trans].
     apply iota_sorted.
-    destruct ([seq d2 * d | d <- index_iota 1 n.+1 & d %| n %/ d2]) as [|h t]eqn:Heql ; first by [].
-    apply/(pathP 0).
+    destruct ([seq (d2 * d)%N | d <- index_iota 1 n.+1 & d %| n %/ d2]) as [|h t]eqn:Heql ; first by [].
+    apply/(pathP 0%N).
     move=> i Hi.
     rewrite -[i < size t]/(i.+1 < size (h::t)) -Heql size_map in Hi.
-    rewrite -[nth 0 t i]/(nth 0 (h::t) i.+1) -Heql (nth_map 0) ;
+    rewrite -[nth 0%N t i]/(nth 0%N (h::t) i.+1) -Heql (nth_map 0%N) ;
       last by apply (ltn_trans (ltnSn i)).
-    rewrite (nth_map 0) // leq_pmul2l //
-      -[nth 0 [seq d <- index_iota 1 n.+1 | d %| n %/ d2] i]/(nth 0 (0::[seq d <- index_iota 1 n.+1 | d %| n %/ d2]) i.+1).
+    rewrite (nth_map 0%N) // leq_pmul2l //
+      -[nth 0%N [seq d <- index_iota 1 n.+1 | d %| n %/ d2] i]/(nth 0%N (0%N::[seq d <- index_iota 1%N n.+1 | d %| n %/ d2]) i.+1).
     move: i.+1 Hi.
     clear i.
     apply/pathP.
@@ -243,7 +197,7 @@ Proof.
       apply/and3P.
       split.
         by rewrite -(dvdn_pmul2r d2_gt_0) divn_mulAC //
-          -(addn0 (n * d2)) divnMDl //
+          -(addn0 (n * d2)%N) divnMDl //
           div0n addn0 -d_eq_k_d2.
         rewrite -(orbF (0 < k)).
         apply ltn_eqF in d2_gt_0.
@@ -262,11 +216,11 @@ Proof.
       rewrite (eqn_pmul2r d2_gt_0) // in H.
       by apply/eqP.
       move/nthP in d_in.
-      destruct (d_in 0) as [i Hi Hd].
+      destruct (d_in 0%N) as [i Hi Hd].
       rewrite size_map in Hi.
-      rewrite (nth_map 0) // in Hd.
-      apply (mem_nth 0) in Hi.
-      remember (nth 0 [seq d <- index_iota 1 n.+1 | d %| n %/ d2] i) as d' eqn:Heqd'.
+      rewrite (nth_map 0%N) // in Hd.
+      apply (mem_nth 0%N) in Hi.
+      remember (nth 0%N [seq d <- index_iota 1 n.+1 | d %| n %/ d2] i) as d' eqn:Heqd'.
       rewrite -Heqd' in Hi.
       rewrite mem_filter.
       rewrite mem_filter in Hi.

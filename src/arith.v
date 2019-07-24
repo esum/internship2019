@@ -3,7 +3,6 @@ From mathcomp Require Import path fintype bigop.
 Add LoadPath "~/git/git.graillo.tf/stage/2019-06/src".
 Require Import seq2.
 
-
 Lemma equiv_eqP : forall P Q x y, reflect P x -> reflect Q y
   -> reflect (P <-> Q) (x == y).
 Proof.
@@ -177,13 +176,13 @@ Qed.
 
 Section primepow_divisors.
 
-Local Lemma primepow_divisors_aux : forall p a b, [seq (NatTrec.mul p \o expn p) i | i <- iota b a] = [seq p ^ i | i <- iota b.+1 a].
+Local Lemma primepow_divisors_aux : forall p a b, [seq (muln p \o expn p) i | i <- iota b a] = [seq p ^ i | i <- iota b.+1 a].
 Proof.
   move=> p ; elim=> [|a IHa] //.
   move=> b /=.
   rewrite IHa.
   congr cons.
-  by rewrite NatTrec.mulE expnS.
+  by rewrite expnS.
 Qed.
 
 Lemma primepow_divisors n : primepow n ->
@@ -212,10 +211,11 @@ Proof.
       unfold divisors in IH ; rewrite pa_decomp /foldr/PrimeDecompAux.add_divisors/iter in IH.
       unfold divisors ; rewrite n_decomp /foldr/PrimeDecompAux.add_divisors/iter.
       rewrite IH /=.
-      rewrite ?NatTrec.mulE expn1 expn0 muln1 (prime_gt0 p_prime) [p ^ 2]/(p * p) -mulnE ;
+      rewrite ?NatTrec.mulE expn1 expn0 muln1 (prime_gt0 p_prime) [p ^ 2]/(p * p) ;
         do 3 congr cons.
       rewrite -map_comp.
-      by rewrite primepow_divisors_aux.
+      rewrite -primepow_divisors_aux.
+      by apply eq_map ; move=> m /= ; rewrite NatTrec.mulE.
 Qed.
 
 End primepow_divisors.
@@ -567,12 +567,6 @@ Proof.
   case=> [|n] d d_dvd_n ; first by apply dvdn0.
   by rewrite dvdn_divisors.
 Qed.
-
-Lemma mulnr : forall m n p, 0 < m -> (n * m == p * m) = (n == p).
-Proof.
-  elim=> [|m IHm] n p m_gt_0 ; first by [].
-Admitted.
-
 
 Lemma div_divisors_perm : forall n, 0 < n -> perm_eq [seq n %/ d | d <- divisors n] (divisors n).
 Proof.
@@ -1540,3 +1534,19 @@ Proof.
 Qed.
 
 End divisors_coprime.
+
+Lemma divisors_filter_prime :
+  forall n, 0 < n
+  -> primes n = [seq d <- divisors n | prime d].
+Proof.
+  move=> n n_gt_0.
+  apply eq_sorted_irr with ltn.
+    by move ; apply ltn_trans.
+    by move ; apply ltnn.
+    apply sorted_primes.
+    apply sorted_filter ; first by [move ; apply ltn_trans] ; apply sorted_divisors_ltn.
+  move=> p.
+  by rewrite mem_primes mem_filter dvdn_divisors n_gt_0.
+Qed.
+
+

@@ -1,7 +1,7 @@
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq div prime.
 From mathcomp Require Import path fintype bigop.
 Add LoadPath "~/git/git.graillo.tf/stage/2019-06/src".
-Require Import seq2 ssrz arith sumz.
+Require Import seq2 arith.
 
 
 Lemma legendre_formula :
